@@ -10,7 +10,7 @@ export const useSocket = () => {
 };
 
 export const SocketProvider = (props) => {
-  const socket = useMemo(() => io("http://localhost:5000"), []);
+  const socket = useMemo(() => io("https://testsujalvideocallfrontendapi.vercel.app/"), []);
   return (
     <SocketContext.Provider value={socket}>
       {props.children}

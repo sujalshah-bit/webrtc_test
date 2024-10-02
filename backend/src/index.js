@@ -9,14 +9,14 @@ const server = http.createServer(app);
 
 // Configure CORS for Express
 app.use(cors({
-    origin: 'https://testsujalvideocallfrontend.vercel.app/', // Allow only your React app's origin
+    origin: 'https://testsujalvideocallfrontend.vercel.app', // Allow only your React app's origin
     methods: ['GET', 'POST'],
     credentials: true
 }));
 
 const io = socketIo(server, {
     cors: {
-        origin: 'https://testsujalvideocallfrontend.vercel.app/', // Allow only your React app's origin
+        origin: 'https://testsujalvideocallfrontend.vercel.app', // Allow only your React app's origin
         methods: ['GET', 'POST'],
         credentials: true
     }

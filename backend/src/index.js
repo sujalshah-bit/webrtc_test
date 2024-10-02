@@ -1,20 +1,21 @@
 // server.js (Express.js)
 const express = require('express');
 const http = require('http');
-const socketIo = require('socket.io');
+const { Server } = require('socket.io');
 const cors = require('cors');
 
 const app = express();
 const server = http.createServer(app);
 
 // Configure CORS for Express
-app.use(cors({
-    cors: true,
-}));
+app.use(cors());
 
-const io = socketIo(server, {
-    cors: true,
-});
+const io = new Server(server, {
+    cors: {
+      origin: "https://testsujalvideocallfrontend.vercel.app",
+      methods: ["GET", "POST"]
+    }
+  });
 
 const emailIdToSocket = new Map();
 const socketToEmailId = new Map();
@@ -50,4 +51,5 @@ io.on("connection", (socket) => {
     });
   });
 
-server.listen(5000, () => console.log('Server running on port 5000'));
+  const PORT = process.env.PORT || 5000;
+  server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -12,7 +12,7 @@ app.use(cors());
 
 const io = new Server(server, {
     cors: {
-      origin: "https://testsujalvideocallfrontend.vercel.app",
+      origin: "https://192.168.29.61:5173",
       methods: ["GET", "POST"]
     }
   });
@@ -33,20 +33,22 @@ io.on("connection", (socket) => {
     });
   
     socket.on("user:call", ({ to, offer }) => {
+      console.log(`User ${socket.id} is calling user ${to} with offer:`, offer);
       io.to(to).emit("incomming:call", { from: socket.id, offer });
     });
   
     socket.on("call:accepted", ({ to, ans }) => {
+      console.log(`Call accepted by user ${to}, sending answer from ${socket.id}`);
       io.to(to).emit("call:accepted", { from: socket.id, ans });
     });
   
     socket.on("peer:nego:needed", ({ to, offer }) => {
-      console.log("peer:nego:needed", offer);
+      console.log(`Negotiation needed between ${socket.id} and ${to} with offer:`, offer);
       io.to(to).emit("peer:nego:needed", { from: socket.id, offer });
     });
   
     socket.on("peer:nego:done", ({ to, ans }) => {
-      console.log("peer:nego:done", ans);
+      console.log(`Negotiation done between ${socket.id} and ${to} with answer:`, ans);
       io.to(to).emit("peer:nego:final", { from: socket.id, ans });
     });
   });

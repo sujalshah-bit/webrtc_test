@@ -51,6 +51,13 @@ io.on("connection", (socket) => {
       console.log(`Negotiation done between ${socket.id} and ${to} with answer:`, ans);
       io.to(to).emit("peer:nego:final", { from: socket.id, ans });
     });
+  
+    socket.on("call:ended", ({ to }) => {
+      console.log(`to ${to} `);
+      io.to(to).emit("call:ended");
+    });
+
+    
   });
 
   app.get('/', (req, res) => {

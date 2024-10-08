@@ -1,5 +1,5 @@
 // Calling.jsx
-import React, { useEffect, useCallback, useState, useRef } from "react";
+import React, { useEffect, useCallback, useRef } from "react";
 import peer from "../services/peer";
 import { useSocket } from "../Context/Socket";
 import { useNavigate } from "react-router-dom";
@@ -12,25 +12,45 @@ import {
   FaStop,
   FaPhoneSlash,
 } from "react-icons/fa";
+import { RiCameraLensLine } from "react-icons/ri";
 import CustomReactPlayer from "./CustomReactPlayer";
+import useStore from "../store/videoCallStore";
 
-const RoomPage = React.memo(() => {
+const Room = React.memo(() => {
   const socket = useSocket();
   const navigate = useNavigate();
-  const [remoteSocketId, setRemoteSocketId] = useState(null);
-  const [myStream, setMyStream] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [isVideoOff, setIsVideoOff] = useState(false);
-  const [streamKey, setStreamKey] = useState(0);
-  const [isCallActive, setIsCallActive] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(true);
+  const { 
+    // user, 
+    currentRoom, 
+    isCallActive, 
+    myStream, 
+    remoteStream, 
+    isMuted, 
+    isVideoOff,
+    isScreenSharing,
+    // remoteUser,
+    // setUser,
+    // setCurrentRoom,
+    setRemoteSocketId,
+    remoteSocketId,
+    setIsCallActive,
+    setMyStream,
+    setRemoteStream,
+    streamKey,
+    incrementStreamKey,
+    setIsMuted,
+    setIsVideoOff,
+    setIsScreenSharing,
+    // setRemoteUser,
+    resetCallState,
+    initializeCall
+  } = useStore();
   const peerRef = useRef(peer);
 
   const handleUserJoined = useCallback(({ email, id }) => {
     console.log(`Email ${email} joined room`);
     setRemoteSocketId(id);
-  }, []);
+  }, [setRemoteSocketId]);
 
   const getScreenAndAudio = useCallback(async (preference = "screenShare") => {
     let displayStream;
@@ -60,26 +80,6 @@ const RoomPage = React.memo(() => {
     return combinedStream;
   }, []);
 
-  const handleCallUser = useCallback(async () => {
-    try {
-      // Create Data Channel
-      peerRef.current.createDataChannel();
-      const stream = await getScreenAndAudio();
-      setMyStream(stream);
-      const offer = await peerRef.current.getOffer();
-      socket.emit("user:call", { to: remoteSocketId, offer });
-      setIsCallActive(true);
-    } catch (error) {
-      console.error("Error in handleCallUser:", error);
-    }
-  }, [getScreenAndAudio, remoteSocketId, socket]);
-
-  const sendStreams = useCallback(() => {
-    for (const track of myStream.getTracks()) {
-      peerRef.current.peer.addTrack(track, myStream);
-    }
-  }, [myStream]);
-
   const replaceTracks = useCallback(
     async (newStream) => {
       const currentPeer = peerRef.current.peer;
@@ -105,7 +105,7 @@ const RoomPage = React.memo(() => {
 
       // Set the new stream to myStream and force re-render
       setMyStream(newStream);
-      setStreamKey((prevKey) => prevKey + 1); // Force re-render
+      incrementStreamKey();
 
       // Add any new tracks that aren't already sent
       newStream.getTracks().forEach((track) => {
@@ -122,8 +122,18 @@ const RoomPage = React.memo(() => {
         }
       });
     },
-    [myStream]
+    [incrementStreamKey, myStream, setMyStream]
   );
+
+  const toggleMute = useCallback(() => {
+    const audioTrack = myStream.getAudioTracks()[0];
+    console.log(myStream.getAudioTracks());
+    if (audioTrack) {
+      audioTrack.enabled = !audioTrack.enabled;
+      setIsMuted(!audioTrack.enabled);
+    }
+    console.log(myStream.getAudioTracks());
+  }, [myStream, setIsMuted]);
 
   // Example to replace screen share tracks with webcam:
   const handleSwitchToWebcam = useCallback(async () => {
@@ -138,10 +148,13 @@ const RoomPage = React.memo(() => {
         });
       console.dir(stream);
       replaceTracks(stream); // Call the replace function with the new webcam stream
+      stream.getAudioTracks()[0].enabled = !isMuted;
+      stream.getVideoTracks()[0].enabled = !isVideoOff;
+
     } catch (error) {
       console.error("Error switching to webcam:", error);
     }
-  }, [replaceTracks]);
+  }, [isMuted, isVideoOff, replaceTracks]);
 
   // Example to replace webcam tracks with screen share:
   const handleSwitchToScreenShare = useCallback(async () => {
@@ -150,10 +163,61 @@ const RoomPage = React.memo(() => {
       console.log(stream);
 
       replaceTracks(stream); // Replace with the combined stream
+      stream.getAudioTracks()[0].enabled = !isMuted;
+      stream.getVideoTracks()[0].enabled = !isVideoOff;
     } catch (error) {
       console.error("Error switching to screen share:", error);
     }
-  }, [getScreenAndAudio, replaceTracks]);
+  }, [getScreenAndAudio, isMuted, isVideoOff, replaceTracks]);
+  
+  const toggleVideo = useCallback(() => {
+    const videoTrack = myStream.getVideoTracks()[0];
+    if (videoTrack) {
+      videoTrack.enabled = !videoTrack.enabled;
+      setIsVideoOff(!videoTrack.enabled); // Sync the state with the actual video track status
+    }
+  }, [myStream, setIsVideoOff]);
+  
+  const toggleScreenShare = useCallback(async () => {
+    try {
+      if (isScreenSharing) {
+        console.log(isScreenSharing);
+        // Stop sharing screen and switch back to camera
+        handleSwitchToWebcam();
+        setIsScreenSharing(false);
+      } else {
+        console.log(isScreenSharing);
+        // Share the screen
+        handleSwitchToScreenShare();
+        setIsScreenSharing(true);
+      }
+    } catch (error) {
+      console.error("Error in toggleScreenShare:", error);
+    }
+  }, [handleSwitchToScreenShare, handleSwitchToWebcam, isScreenSharing, setIsScreenSharing]);
+
+  const handleCallUser = useCallback(async () => {
+    try {
+      // Create Data Channel
+      peerRef.current.createDataChannel();
+      const stream = await getScreenAndAudio();
+      setMyStream(stream);
+      initializeCall(currentRoom, stream);
+      const offer = await peerRef.current.getOffer();
+      socket.emit("user:call", { to: remoteSocketId, offer });
+      setIsCallActive(true);
+    } catch (error) {
+      console.error("Error in handleCallUser:", error);
+    }
+  }, [currentRoom, getScreenAndAudio, initializeCall, remoteSocketId, setIsCallActive, setMyStream, socket]);
+
+  const sendStreams = useCallback(() => {
+    for (const track of myStream.getTracks()) {
+      peerRef.current.peer.addTrack(track, myStream);
+    }
+  }, [myStream]);
+
+
 
   const handleIncomingCall = useCallback(
     async ({ from, offer }) => {
@@ -166,11 +230,12 @@ const RoomPage = React.memo(() => {
         const ans = await peerRef.current.getAnswer(offer);
         socket.emit("call:accepted", { to: from, ans });
         setIsCallActive(true);
+        setIsScreenSharing(false)
       } catch (error) {
         console.error("Error in handleIncomingCall:", error);
       }
     },
-    [getScreenAndAudio, socket]
+    [getScreenAndAudio, setIsCallActive, setIsScreenSharing, setMyStream, setRemoteSocketId, socket]
   );
 
   const handleEndCall = useCallback(() => {
@@ -180,29 +245,18 @@ const RoomPage = React.memo(() => {
     }
 
     // Close the data channel if it exists
-    if (peerRef.current.dataChannel) {
-      peerRef.current.dataChannel.close();
-    }
-
-    // Close the peer connection
-    if (peerRef.current.peer) {
-      peerRef.current.peer.close();
-    }
+    peerRef.current.reset();
 
     // Reset state
-    setMyStream(null);
-    setRemoteStream(null);
-    setRemoteSocketId(null);
-    setIsCallActive(false);
-    setIsScreenSharing(true);
-    setStreamKey((prevKey) => prevKey + 1);
+    resetCallState()
 
     // Emit an event to inform the other peer that the call has ended
     if (remoteSocketId) {
       socket.emit("call:ended", { to: remoteSocketId });
     }
     navigate("/lobby");
-  }, [myStream, navigate, remoteSocketId, socket]);
+    window.location.reload();
+  }, [myStream, navigate, remoteSocketId, resetCallState, socket]);
 
   const handleCallAccepted = useCallback(
     ({ ans }) => {
@@ -238,42 +292,6 @@ const RoomPage = React.memo(() => {
     await peerRef.current.setLocalDescription(ans);
   }, []);
 
-  const toggleMute = useCallback(() => {
-    const audioTrack = myStream.getAudioTracks()[0];
-    console.log(myStream.getAudioTracks());
-    if (audioTrack) {
-      audioTrack.enabled = !audioTrack.enabled;
-      setIsMuted(!audioTrack.enabled);
-    }
-    console.log(myStream.getAudioTracks());
-  }, [myStream]);
-
-  const toggleVideo = useCallback(() => {
-    const videoTrack = myStream.getVideoTracks()[0];
-    if (videoTrack) {
-      videoTrack.enabled = !videoTrack.enabled;
-      setIsVideoOff(!videoTrack.enabled);
-    }
-  }, [myStream]);
-
-  const toggleScreenShare = useCallback(async () => {
-    try {
-      if (isScreenSharing) {
-        console.log(isScreenSharing);
-        // Stop sharing screen and switch back to camera
-        setIsScreenSharing(false);
-        handleSwitchToWebcam();
-      } else {
-        console.log(isScreenSharing);
-        // Share the screen
-        setIsScreenSharing(true);
-        handleSwitchToScreenShare();
-      }
-    } catch (error) {
-      console.error("Error in toggleScreenShare:", error);
-    }
-  }, [handleSwitchToScreenShare, handleSwitchToWebcam, isScreenSharing]);
-
   // Add a new effect to handle the "call:ended" event
   useEffect(() => {
     const handleCallEnded = () => {
@@ -304,7 +322,7 @@ const RoomPage = React.memo(() => {
         handleNegoNeeded
       );
     };
-  }, [handleNegoNeeded]);
+  }, [handleNegoNeeded, setRemoteStream]);
 
   useEffect(() => {
     const socketEvents = [
@@ -345,7 +363,7 @@ const RoomPage = React.memo(() => {
             {isVideoOff ? <FaVideoSlash /> : <FaVideo />}
           </button>
           <button onClick={toggleScreenShare}>
-            {isScreenSharing ? <FaStop /> : <FaDesktop />}
+            {isScreenSharing ? <RiCameraLensLine /> : <FaDesktop />}
           </button>
           <button onClick={handleEndCall}>
             <FaPhoneSlash />
@@ -389,6 +407,6 @@ const RoomPage = React.memo(() => {
   );
 });
 
-RoomPage.displayName = "RoomPage";
+Room.displayName = "Room";
 
-export default RoomPage;
+export default Room;

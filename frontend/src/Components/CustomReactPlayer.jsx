@@ -2,7 +2,7 @@ import  { useState } from "react";
 import ReactPlayer from "react-player";
 
 // eslint-disable-next-line react/prop-types
-const CustomReactPlayer = ({ myStream, isVideoOff = false, streamKey = "", isMuted = false }) => {
+const CustomReactPlayer = ({ myStream, isVideoOff, streamKey, isMuted }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   const toggleFullScreen = () => {

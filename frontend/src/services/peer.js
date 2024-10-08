@@ -2,6 +2,10 @@
 
 class PeerService {
     constructor() {
+        this.initializePeerConnection();
+    }
+
+    initializePeerConnection() {
         if (!this.peer) {
             this.peer = new RTCPeerConnection({
                 iceServers: [
@@ -13,8 +17,19 @@ class PeerService {
                     },
                 ],
             });
-            this.dataChannel = null;  // This will store the Data Channel instance
+            this.dataChannel = null;
         }
+
+    }
+
+    reset() {
+        if (this.dataChannel) {
+            this.dataChannel.close();
+        }
+        if (this.peer) {
+            this.peer.close();
+        }
+        this.initializePeerConnection();
     }
 
     async setLocalDescription(ans) {
@@ -86,4 +101,4 @@ class PeerService {
 
 }
 
-export default new PeerService;
+export default new PeerService();

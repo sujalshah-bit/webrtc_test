@@ -1,9 +1,10 @@
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import Home from "./Components/Home";
 import Lobby from "./Components/Lobby";
-// import VideoCall from "./Components/VideoCall";
 import Calling from "./Components/Calling";
+import Room from "./Components/Room";
 import { SocketProvider } from "./Context/Socket";
+
 
 function App() {
   const router = createBrowserRouter([
@@ -11,10 +12,6 @@ function App() {
       path: "/",
       element: <Home />,
     },
-    // {
-    //     path: '/test',
-    //     element: <VideoCall />,
-    // },
     {
       path: "/lobby",
       element: <Lobby />,
@@ -22,6 +19,10 @@ function App() {
     {
       path: "/calling/:id",
       element: <Calling />,
+    },
+    {
+      path: "/room/:id",
+      element: <Room />,
     },
   ]);
 
